@@ -1,28 +1,63 @@
 version: '3.3'
 
 services:
-   db:
-     image: mysql:5.7
-     volumes:
-       - db_data:/var/lib/mysql
-     restart: always
-     environment:
-       MYSQL_ROOT_PASSWORD: somewordpress
-       MYSQL_DATABASE: wordpress
-       MYSQL_USER: wordpress
-       MYSQL_PASSWORD: wordpress
+  reverse:
+    container_name: reverse
+    hostname: reverse
+    image: nginx:1.19-alpine
+    ports:
+      - 80:80
+      - 443:443
+    volumes:
+      - ./conifg:/etc/nginx
+      - ./certs:/etc/ssl/private
+    networks:
+      - app-network
 
-   wordpress:
-     depends_on:
-       - db
-     image: wordpress:latest
-     ports:
-       - "8000:80"
-     restart: always
-     environment:
-       WORDPRESS_DB_HOST: db:3306
-       WORDPRESS_DB_USER: wordpress
-       WORDPRESS_DB_PASSWORD: wordpress
-       WORDPRESS_DB_NAME: wordpress
+  db:
+    image: mysql:5.7
+    volumes:
+      - db_data:/var/lib/mysql
+    restart: always
+    environment:
+      - MYSQL_ROOT_PASSWORD=/run/secrets/db-root
+      - MYSQL_DATABASE=/run/secrets/db-password
+      - MYSQL_USER=/run/secrets/db-password
+      - MYSQL_PASSWORD=/run/secrets/db-password
+    secrets:
+      - db-password
+      - db-root
+    networks:
+      - app-network
+
+  wordpress:
+    depends_on:
+      - db
+    image: wordpress:latest
+    ports:
+      - "8000:80"
+    restart: always
+    environment:
+      - WORDPRESS_DB_HOST=/run/secrets/wordpress-host
+      - WORDPRESS_DB_USER=/run/secrets/wordpress-secrets
+      - WORDPRESS_DB_PASSWORD=/run/secrets/wordpress-secrets
+      - WORDPRESS_DB_NAME=/run/secrets/wordpress-secrets
+    secrets:
+      - wordpress-db-host
+      - wordpress-secrets
+    networks:
+      - app-network
+
 volumes:
-    db_data: {}
+  db_data: {}
+secrets:
+  db-password:
+    file: db/mysql_secrets.txt
+  db-root:
+    file: db/mysql_root_secrets.txt
+  wordpress-db-host:
+    file: db/wordpress_db_host.txt
+  wordpress-secrets:
+    file: db/wordpress_secrets.txt
+networks:
+  app-network:
